@@ -1,0 +1,96 @@
+package handlers
+
+import (
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/twomotive/dropwise/internal/config"
+	db "github.com/twomotive/dropwise/internal/database/sqlc"
+	"github.com/twomotive/dropwise/internal/server/httputils"
+)
+
+// DropsHandler handles HTTP requests for drops.
+type DropsHandler struct {
+	APIConfig *config.APIConfig
+}
+
+// NewDropsHandler creates a new DropsHandler.
+func NewDropsHandler(apiCfg *config.APIConfig) *DropsHandler {
+	return &DropsHandler{APIConfig: apiCfg}
+}
+
+// CreateDropRequest defines the expected request body for creating a drop.
+type CreateDropRequest struct {
+	UserID    string `json:"user_id"` // Will be made more robust later
+	Topic     string `json:"topic"`
+	URL       string `json:"url"`
+	UserNotes string `json:"user_notes,omitempty"`
+	Priority  *int32 `json:"priority,omitempty"`
+}
+
+// CreateDropHandler handles the creation of a new drop.
+// POST /api/v1/drops
+func (h *DropsHandler) CreateDropHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only POST method is allowed")
+		return
+	}
+
+	var req CreateDropRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload: "+err.Error())
+		return
+	}
+	defer r.Body.Close()
+
+	// Basic Validation
+	if strings.TrimSpace(req.Topic) == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Topic cannot be empty")
+		return
+	}
+	if strings.TrimSpace(req.URL) == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "URL cannot be empty")
+		return
+	}
+	// A placeholder for UserID until proper auth is implemented.
+	// For now, if not provided in request, use a default.
+	// In a real app, this would come from auth context.
+	userID := req.UserID
+	if strings.TrimSpace(userID) == "" {
+		userID = "default-user" // Placeholder
+		log.Printf("UserID not provided, using default: %s", userID)
+	}
+
+	params := db.CreateDropParams{
+		UserID: sql.NullString{String: userID, Valid: true},
+		Topic:  req.Topic,
+		Url:    req.URL,
+	}
+
+	if req.UserNotes != "" {
+		params.UserNotes = sql.NullString{String: req.UserNotes, Valid: true}
+	} else {
+		params.UserNotes = sql.NullString{Valid: false}
+	}
+
+	if req.Priority != nil {
+		params.Priority = sql.NullInt32{Int32: *req.Priority, Valid: true}
+	} else {
+		params.Priority = sql.NullInt32{Valid: false}
+	}
+
+	log.Printf("Attempting to create drop with UserID: %s, Topic: %s", params.UserID.String, params.Topic)
+
+	createdDrop, err := h.APIConfig.DB.CreateDrop(r.Context(), params)
+	if err != nil {
+		log.Printf("Error creating drop in database: %v", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to create drop: "+err.Error())
+		return
+	}
+
+	log.Printf("Successfully created drop with ID: %s", createdDrop.ID.String())
+	httputils.RespondWithJSON(w, http.StatusCreated, createdDrop)
+}
