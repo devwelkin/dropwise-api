@@ -8,6 +8,8 @@ package db
 import (
 	"context"
 	"database/sql"
+
+	"github.com/google/uuid"
 )
 
 const createDrop = `-- name: CreateDrop :one
@@ -39,6 +41,30 @@ func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, e
 		arg.UserNotes,
 		arg.Priority,
 	)
+	var i Drop
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Topic,
+		&i.Url,
+		&i.UserNotes,
+		&i.AddedDate,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.LastSentDate,
+		&i.SendCount,
+		&i.Priority,
+	)
+	return i, err
+}
+
+const getDrop = `-- name: GetDrop :one
+SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
+WHERE id = $1
+`
+
+func (q *Queries) GetDrop(ctx context.Context, id uuid.UUID) (Drop, error) {
+	row := q.db.QueryRowContext(ctx, getDrop, id)
 	var i Drop
 	err := row.Scan(
 		&i.ID,

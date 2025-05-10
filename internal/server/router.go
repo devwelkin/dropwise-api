@@ -25,5 +25,8 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 	// POST /api/v1/drops - Create a new drop
 	mux.HandleFunc("POST /api/v1/drops", dropsHandler.CreateDropHandler)
 
+	// GET /api/v1/drops/{id} - Get a specific drop
+	mux.HandleFunc("GET /api/v1/drops/{id}", dropsHandler.GetDropHandler)
+
 	return mux
 }

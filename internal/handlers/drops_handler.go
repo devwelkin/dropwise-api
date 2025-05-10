@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/twomotive/dropwise/internal/config"
 	db "github.com/twomotive/dropwise/internal/database/sqlc"
 	"github.com/twomotive/dropwise/internal/server/httputils"
@@ -93,4 +94,40 @@ func (h *DropsHandler) CreateDropHandler(w http.ResponseWriter, r *http.Request)
 
 	log.Printf("Successfully created drop with ID: %s", createdDrop.ID.String())
 	httputils.RespondWithJSON(w, http.StatusCreated, createdDrop)
+}
+
+func (h *DropsHandler) GetDropHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only GET method is allowed")
+		return
+	}
+
+	dropIDStr := r.PathValue("id")
+	if dropIDStr == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Drop ID is required in the path")
+		return
+	}
+
+	dropID, err := uuid.Parse(dropIDStr)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Invalid Drop ID format: "+err.Error())
+		return
+	}
+
+	log.Printf("Attempting to fetch drop with ID: %s", dropID.String())
+
+	drop, err := h.APIConfig.DB.GetDrop(r.Context(), dropID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("Drop with ID %s not found", dropID.String())
+			httputils.RespondWithError(w, http.StatusNotFound, "Drop not found")
+		} else {
+			log.Printf("Error fetching drop from database: %v", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch drop: "+err.Error())
+		}
+		return
+	}
+
+	log.Printf("Successfully fetched drop with ID: %s", drop.ID.String())
+	httputils.RespondWithJSON(w, http.StatusOK, drop)
 }
