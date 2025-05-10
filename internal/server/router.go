@@ -14,6 +14,7 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 
 	// Initialize handlers
 	dropsHandler := handlers.NewDropsHandler(apiCfg)
+	tagsHandler := handlers.NewTagsHandler(apiCfg)
 
 	// --- Route Definitions ---
 
@@ -36,6 +37,10 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 
 	// DELETE /api/v1/drops/{id} - Delete a specific drop
 	mux.HandleFunc("DELETE /api/v1/drops/{id}", dropsHandler.DeleteDropHandler)
+
+	// --- Tag Endpoints ---
+	// GET /api/v1/tags - List all unique tags
+	mux.HandleFunc("GET /api/v1/tags", tagsHandler.ListTagsHandler)
 
 	return mux
 }
