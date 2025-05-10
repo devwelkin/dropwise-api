@@ -81,3 +81,44 @@ func (q *Queries) GetDrop(ctx context.Context, id uuid.UUID) (Drop, error) {
 	)
 	return i, err
 }
+
+const listDrops = `-- name: ListDrops :many
+SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
+WHERE user_id = $1
+ORDER BY added_date DESC
+`
+
+func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop, error) {
+	rows, err := q.db.QueryContext(ctx, listDrops, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Drop
+	for rows.Next() {
+		var i Drop
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Topic,
+			&i.Url,
+			&i.UserNotes,
+			&i.AddedDate,
+			&i.UpdatedAt,
+			&i.Status,
+			&i.LastSentDate,
+			&i.SendCount,
+			&i.Priority,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

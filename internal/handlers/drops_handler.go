@@ -131,3 +131,33 @@ func (h *DropsHandler) GetDropHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Successfully fetched drop with ID: %s", drop.ID.String())
 	httputils.RespondWithJSON(w, http.StatusOK, drop)
 }
+
+func (h *DropsHandler) ListDropsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only GET method is allowed")
+		return
+	}
+
+	// Placeholder for UserID until proper auth is implemented.
+	// In a real app, this would come from auth context.
+	// For now, we'll use a default user ID to list drops.
+	// This should be consistent with the UserID used in CreateDropHandler.
+	userID := "default-user" // Placeholder
+	log.Printf("Attempting to list drops for UserID: %s", userID)
+
+	drops, err := h.APIConfig.DB.ListDrops(r.Context(), sql.NullString{String: userID, Valid: true})
+	if err != nil {
+		log.Printf("Error fetching drops from database: %v", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch drops: "+err.Error())
+		return
+	}
+
+	// If no drops are found, drops will be an empty slice (nil or zero-length).
+	// Responding with an empty JSON array [] is the correct behavior for this case.
+	if drops == nil {
+		drops = []db.Drop{} // Ensure a non-nil slice for JSON marshaling as []
+	}
+
+	log.Printf("Successfully fetched %d drops for UserID: %s", len(drops), userID)
+	httputils.RespondWithJSON(w, http.StatusOK, drops)
+}

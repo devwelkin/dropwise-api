@@ -28,5 +28,8 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 	// GET /api/v1/drops/{id} - Get a specific drop
 	mux.HandleFunc("GET /api/v1/drops/{id}", dropsHandler.GetDropHandler)
 
+	// GET /api/v1/drops - List all drops for a user
+	mux.HandleFunc("GET /api/v1/drops", dropsHandler.ListDropsHandler)
+
 	return mux
 }

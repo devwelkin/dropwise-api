@@ -14,3 +14,9 @@ RETURNING *;
 -- name: GetDrop :one
 SELECT * FROM drops
 WHERE id = $1;
+
+
+-- name: ListDrops :many
+SELECT * FROM drops
+WHERE user_id = $1
+ORDER BY added_date DESC;
