@@ -35,11 +35,12 @@ type CreateDropRequest struct {
 }
 
 type UpdateDropRequest struct {
-	Topic     *string `json:"topic,omitempty"`
-	URL       *string `json:"url,omitempty"`
-	UserNotes *string `json:"user_notes,omitempty"`
-	Priority  *int32  `json:"priority,omitempty"`
-	Status    *string `json:"status,omitempty"` // e.g., "new", "sent", "archived"
+	Topic     *string   `json:"topic,omitempty"`
+	URL       *string   `json:"url,omitempty"`
+	UserNotes *string   `json:"user_notes,omitempty"`
+	Priority  *int32    `json:"priority,omitempty"`
+	Status    *string   `json:"status,omitempty"` // e.g., "new", "sent", "archived"
+	Tags      *[]string `json:"tags,omitempty"`
 }
 
 type DropResponse struct {
@@ -257,8 +258,19 @@ func (h *DropsHandler) ListDropsHandler(w http.ResponseWriter, r *http.Request) 
 		drops = []db.Drop{} // Ensure a non-nil slice for JSON marshaling as []
 	}
 
-	log.Printf("Successfully fetched %d drops for UserID: %s", len(drops), userID)
-	httputils.RespondWithJSON(w, http.StatusOK, drops)
+	// Prepare the response by converting each db.Drop to DropResponse, including its tags.
+	dropResponses := make([]DropResponse, 0, len(drops))
+	for _, drop := range drops {
+		tags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), drop.ID)
+		if err != nil {
+			log.Printf("Error fetching tags for drop %s during list operation: %v. Proceeding with empty tags for this drop.", drop.ID, err)
+			tags = []db.Tag{} // Default to empty tags on error for this specific drop
+		}
+		dropResponses = append(dropResponses, toDropResponse(drop, tags))
+	}
+
+	log.Printf("Successfully fetched %d drops for UserID: %s, now with tags", len(dropResponses), userID)
+	httputils.RespondWithJSON(w, http.StatusOK, dropResponses)
 }
 
 // UpdateDropHandler handles updating an existing drop.
@@ -340,8 +352,63 @@ func (h *DropsHandler) UpdateDropHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("Successfully updated drop with ID: %s", updatedDrop.ID.String())
-	httputils.RespondWithJSON(w, http.StatusOK, updatedDrop)
+	// --- Tag Update Logic ---
+	// Check if the 'tags' field was provided in the request.
+	// If req.Tags is nil, it means the client did not intend to update tags.
+	// If req.Tags is not nil (even if it's an empty slice *[]string{}), it means an update to tags is intended.
+	if req.Tags != nil {
+		log.Printf("Updating tags for drop ID: %s", dropID.String())
+		// 1. Remove all existing tags for this drop
+		err = h.APIConfig.DB.RemoveAllTagsFromDrop(r.Context(), dropID)
+		if err != nil {
+			log.Printf("Error removing existing tags for drop %s: %v", dropID, err)
+			// Potentially return an error here, or log and continue if partial success is acceptable.
+			// For now, we log and proceed to add new tags. The drop's core fields are already updated.
+		}
+
+		// 2. Add new tags if any are provided
+		if len(*req.Tags) > 0 {
+			for _, tagName := range *req.Tags {
+				trimmedTagName := strings.TrimSpace(tagName)
+				if trimmedTagName == "" {
+					continue // Skip empty tag names
+				}
+
+				// Get or create the tag
+				tag, err := h.APIConfig.DB.CreateTag(r.Context(), trimmedTagName)
+				if err != nil {
+					log.Printf("Error creating/getting tag '%s' for drop %s: %v", trimmedTagName, dropID, err)
+					continue // Skip this tag and proceed with others
+				}
+
+				// Associate tag with drop
+				err = h.APIConfig.DB.AddTagToDrop(r.Context(), db.AddTagToDropParams{
+					DropsID: dropID,
+					TagID:   tag.ID,
+				})
+				if err != nil {
+					log.Printf("Error associating tag '%s' (ID: %d) with drop '%s': %v", trimmedTagName, tag.ID, dropID, err)
+					// Skip this association and proceed
+				}
+			}
+		}
+		log.Printf("Finished updating tags for drop ID: %s", dropID.String())
+	}
+	// --- End Tag Update Logic ---
+
+	// Fetch the final state of the drop and its tags for the response
+	// updatedDrop already contains the updated core fields.
+	// We need to fetch the latest tags.
+	finalTags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), updatedDrop.ID)
+	if err != nil {
+		log.Printf("Error fetching tags for drop %s after update: %v", updatedDrop.ID, err)
+		// If fetching tags fails, return the drop with empty tags for now.
+		finalTags = []db.Tag{}
+	}
+
+	log.Printf("Successfully updated drop with ID: %s and its tags", updatedDrop.ID.String())
+	response := toDropResponse(updatedDrop, finalTags)
+	httputils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // DeleteDropHandler handles deleting an existing drop.
