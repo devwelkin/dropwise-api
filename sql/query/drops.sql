@@ -20,3 +20,16 @@ WHERE id = $1;
 SELECT * FROM drops
 WHERE user_id = $1
 ORDER BY added_date DESC;
+
+
+-- name: UpdateDrop :one
+UPDATE drops
+SET
+    topic = COALESCE(sqlc.narg('topic'), topic),
+    url = COALESCE(sqlc.narg('url'), url),
+    user_notes = COALESCE(sqlc.narg('user_notes'), user_notes),
+    priority = COALESCE(sqlc.narg('priority'), priority),
+    status = COALESCE(sqlc.narg('status'), status)
+    -- updated_at is handled by the database trigger
+WHERE id = $1 AND user_id = $2
+RETURNING *;

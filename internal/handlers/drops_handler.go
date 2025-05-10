@@ -32,6 +32,14 @@ type CreateDropRequest struct {
 	Priority  *int32 `json:"priority,omitempty"`
 }
 
+type UpdateDropRequest struct {
+	Topic     *string `json:"topic,omitempty"`
+	URL       *string `json:"url,omitempty"`
+	UserNotes *string `json:"user_notes,omitempty"`
+	Priority  *int32  `json:"priority,omitempty"`
+	Status    *string `json:"status,omitempty"` // e.g., "new", "sent", "archived"
+}
+
 // CreateDropHandler handles the creation of a new drop.
 // POST /api/v1/drops
 func (h *DropsHandler) CreateDropHandler(w http.ResponseWriter, r *http.Request) {
@@ -160,4 +168,85 @@ func (h *DropsHandler) ListDropsHandler(w http.ResponseWriter, r *http.Request) 
 
 	log.Printf("Successfully fetched %d drops for UserID: %s", len(drops), userID)
 	httputils.RespondWithJSON(w, http.StatusOK, drops)
+}
+
+func (h *DropsHandler) UpdateDropHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only PUT method is allowed")
+		return
+	}
+
+	dropIDStr := r.PathValue("id") // Available in Go 1.22+
+	if dropIDStr == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Drop ID is required in the path")
+		return
+	}
+
+	dropID, err := uuid.Parse(dropIDStr)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Invalid Drop ID format: "+err.Error())
+		return
+	}
+
+	var req UpdateDropRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload: "+err.Error())
+		return
+	}
+	defer r.Body.Close()
+
+	// Placeholder for UserID until proper auth is implemented.
+	// This should be consistent with the UserID used in CreateDropHandler.
+	userID := "default-user" // Placeholder
+	log.Printf("Attempting to update drop with ID: %s for UserID: %s", dropID.String(), userID)
+
+	params := db.UpdateDropParams{
+		ID:     dropID,
+		UserID: sql.NullString{String: userID, Valid: true},
+	}
+
+	if req.Topic != nil {
+		if strings.TrimSpace(*req.Topic) == "" {
+			httputils.RespondWithError(w, http.StatusBadRequest, "Topic cannot be empty if provided")
+			return
+		}
+		params.Topic = sql.NullString{String: *req.Topic, Valid: true}
+	}
+	if req.URL != nil {
+		if strings.TrimSpace(*req.URL) == "" {
+			httputils.RespondWithError(w, http.StatusBadRequest, "URL cannot be empty if provided")
+			return
+		}
+		params.Url = sql.NullString{String: *req.URL, Valid: true} // Note: DB schema field is 'url'
+	}
+	if req.UserNotes != nil {
+		params.UserNotes = sql.NullString{String: *req.UserNotes, Valid: true}
+	}
+	if req.Priority != nil {
+		params.Priority = sql.NullInt32{Int32: *req.Priority, Valid: true}
+	}
+	if req.Status != nil {
+		// Basic validation for status enum, can be expanded
+		validStatuses := map[string]bool{"new": true, "sent": true, "archived": true, "snoozed": true}
+		if !validStatuses[*req.Status] {
+			httputils.RespondWithError(w, http.StatusBadRequest, "Invalid status value. Allowed: new, sent, archived, snoozed.")
+			return
+		}
+		params.Status = sql.NullString{String: *req.Status, Valid: true}
+	}
+
+	updatedDrop, err := h.APIConfig.DB.UpdateDrop(r.Context(), params)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("Drop with ID %s not found or user %s not authorized to update", dropID.String(), userID)
+			httputils.RespondWithError(w, http.StatusNotFound, "Drop not found or not authorized to update")
+		} else {
+			log.Printf("Error updating drop in database: %v", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to update drop: "+err.Error())
+		}
+		return
+	}
+
+	log.Printf("Successfully updated drop with ID: %s", updatedDrop.ID.String())
+	httputils.RespondWithJSON(w, http.StatusOK, updatedDrop)
 }

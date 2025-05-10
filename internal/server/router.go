@@ -31,5 +31,8 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 	// GET /api/v1/drops - List all drops for a user
 	mux.HandleFunc("GET /api/v1/drops", dropsHandler.ListDropsHandler)
 
+	// PUT /api/v1/drops/{id} - Update a specific drop
+	mux.HandleFunc("PUT /api/v1/drops/{id}", dropsHandler.UpdateDropHandler)
+
 	return mux
 }

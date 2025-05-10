@@ -122,3 +122,53 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 	}
 	return items, nil
 }
+
+const updateDrop = `-- name: UpdateDrop :one
+UPDATE drops
+SET
+    topic = COALESCE($3, topic),
+    url = COALESCE($4, url),
+    user_notes = COALESCE($5, user_notes),
+    priority = COALESCE($6, priority),
+    status = COALESCE($7, status)
+    -- updated_at is handled by the database trigger
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+`
+
+type UpdateDropParams struct {
+	ID        uuid.UUID
+	UserID    sql.NullString
+	Topic     sql.NullString
+	Url       sql.NullString
+	UserNotes sql.NullString
+	Priority  sql.NullInt32
+	Status    sql.NullString
+}
+
+func (q *Queries) UpdateDrop(ctx context.Context, arg UpdateDropParams) (Drop, error) {
+	row := q.db.QueryRowContext(ctx, updateDrop,
+		arg.ID,
+		arg.UserID,
+		arg.Topic,
+		arg.Url,
+		arg.UserNotes,
+		arg.Priority,
+		arg.Status,
+	)
+	var i Drop
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Topic,
+		&i.Url,
+		&i.UserNotes,
+		&i.AddedDate,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.LastSentDate,
+		&i.SendCount,
+		&i.Priority,
+	)
+	return i, err
+}
