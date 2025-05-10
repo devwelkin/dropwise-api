@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/twomotive/dropwise/internal/config"
@@ -25,11 +26,12 @@ func NewDropsHandler(apiCfg *config.APIConfig) *DropsHandler {
 
 // CreateDropRequest defines the expected request body for creating a drop.
 type CreateDropRequest struct {
-	UserID    string `json:"user_id"` // Will be made more robust later
-	Topic     string `json:"topic"`
-	URL       string `json:"url"`
-	UserNotes string `json:"user_notes,omitempty"`
-	Priority  *int32 `json:"priority,omitempty"`
+	UserID    string   `json:"user_id"` // Will be made more robust later
+	Topic     string   `json:"topic"`
+	URL       string   `json:"url"`
+	UserNotes string   `json:"user_notes,omitempty"`
+	Priority  *int32   `json:"priority,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
 }
 
 type UpdateDropRequest struct {
@@ -38,6 +40,44 @@ type UpdateDropRequest struct {
 	UserNotes *string `json:"user_notes,omitempty"`
 	Priority  *int32  `json:"priority,omitempty"`
 	Status    *string `json:"status,omitempty"` // e.g., "new", "sent", "archived"
+}
+
+type DropResponse struct {
+	ID           uuid.UUID      `json:"id"`
+	UserID       sql.NullString `json:"user_id"`
+	Topic        string         `json:"topic"`
+	Url          string         `json:"url"`
+	UserNotes    sql.NullString `json:"user_notes"`
+	AddedDate    time.Time      `json:"added_date"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	Status       string         `json:"status"`
+	LastSentDate sql.NullTime   `json:"last_sent_date"`
+	SendCount    int32          `json:"send_count"`
+	Priority     sql.NullInt32  `json:"priority"`
+	Tags         []string       `json:"tags"`
+}
+
+// Helper function to convert db.Drop and []db.Tag to DropResponse
+func toDropResponse(drop db.Drop, tags []db.Tag) DropResponse {
+	tagNames := make([]string, len(tags))
+	for i, t := range tags {
+		tagNames[i] = t.Name
+	}
+
+	return DropResponse{
+		ID:           drop.ID,
+		UserID:       drop.UserID,
+		Topic:        drop.Topic,
+		Url:          drop.Url,
+		UserNotes:    drop.UserNotes,
+		AddedDate:    drop.AddedDate,
+		UpdatedAt:    drop.UpdatedAt,
+		Status:       drop.Status,
+		LastSentDate: drop.LastSentDate,
+		SendCount:    drop.SendCount,
+		Priority:     drop.Priority,
+		Tags:         tagNames,
+	}
 }
 
 // CreateDropHandler handles the creation of a new drop.
@@ -100,8 +140,47 @@ func (h *DropsHandler) CreateDropHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Process tags
+	if len(req.Tags) > 0 {
+		for _, tagName := range req.Tags {
+			trimmedTagName := strings.TrimSpace(tagName)
+			if trimmedTagName == "" {
+				continue // Skip empty tag names
+			}
+
+			// Get or create the tag
+			tag, err := h.APIConfig.DB.CreateTag(r.Context(), trimmedTagName)
+			if err != nil {
+				log.Printf("Error creating/getting tag '%s': %v", trimmedTagName, err)
+				// Log and continue, not associating this specific tag if CreateTag fails
+				continue
+			}
+
+			// Associate tag with drop
+			err = h.APIConfig.DB.AddTagToDrop(r.Context(), db.AddTagToDropParams{
+				DropsID: createdDrop.ID,
+				TagID:   tag.ID,
+			})
+			if err != nil {
+				log.Printf("Error associating tag '%s' (ID: %d) with drop '%s': %v", trimmedTagName, tag.ID, createdDrop.ID, err)
+				// Log and continue if association fails
+				continue
+			}
+		}
+	}
+
+	// Fetch all tags for the response (ensures consistency if some tags failed to associate)
+	finalTags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), createdDrop.ID)
+	if err != nil {
+		log.Printf("Error fetching tags for drop %s after creation: %v", createdDrop.ID, err)
+		// Respond with the drop but potentially without tags or an error
+		// For now, we'll return the drop with whatever tags were successfully fetched (could be none)
+		finalTags = []db.Tag{} // Default to empty if error
+	}
+
 	log.Printf("Successfully created drop with ID: %s", createdDrop.ID.String())
-	httputils.RespondWithJSON(w, http.StatusCreated, createdDrop)
+	response := toDropResponse(createdDrop, finalTags)
+	httputils.RespondWithJSON(w, http.StatusCreated, response)
 }
 
 func (h *DropsHandler) GetDropHandler(w http.ResponseWriter, r *http.Request) {
@@ -136,8 +215,18 @@ func (h *DropsHandler) GetDropHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Successfully fetched drop with ID: %s", drop.ID.String())
-	httputils.RespondWithJSON(w, http.StatusOK, drop)
+	// Fetch associated tags
+	tags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), drop.ID)
+	if err != nil {
+		log.Printf("Error fetching tags for drop %s: %v", drop.ID, err)
+		// Depending on requirements, you might return an error or just the drop without tags.
+		// For now, we'll return the drop with empty tags if fetching tags fails.
+		tags = []db.Tag{}
+	}
+
+	log.Printf("Successfully fetched drop with ID: %s and %d tags", drop.ID.String(), len(tags))
+	response := toDropResponse(drop, tags)
+	httputils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // ListDropsHandler handles fetching all drops for a user.
