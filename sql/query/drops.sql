@@ -33,3 +33,8 @@ SET
     -- updated_at is handled by the database trigger
 WHERE id = $1 AND user_id = $2
 RETURNING *;
+
+
+-- name: DeleteDrop :exec
+DELETE FROM drops
+WHERE id = $1 AND user_id = $2;

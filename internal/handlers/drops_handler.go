@@ -140,6 +140,8 @@ func (h *DropsHandler) GetDropHandler(w http.ResponseWriter, r *http.Request) {
 	httputils.RespondWithJSON(w, http.StatusOK, drop)
 }
 
+// ListDropsHandler handles fetching all drops for a user.
+// GET /api/v1/drops
 func (h *DropsHandler) ListDropsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only GET method is allowed")
@@ -170,6 +172,8 @@ func (h *DropsHandler) ListDropsHandler(w http.ResponseWriter, r *http.Request) 
 	httputils.RespondWithJSON(w, http.StatusOK, drops)
 }
 
+// UpdateDropHandler handles updating an existing drop.
+// PUT /api/v1/drops/{id}
 func (h *DropsHandler) UpdateDropHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only PUT method is allowed")
@@ -249,4 +253,50 @@ func (h *DropsHandler) UpdateDropHandler(w http.ResponseWriter, r *http.Request)
 
 	log.Printf("Successfully updated drop with ID: %s", updatedDrop.ID.String())
 	httputils.RespondWithJSON(w, http.StatusOK, updatedDrop)
+}
+
+// DeleteDropHandler handles deleting an existing drop.
+// DELETE /api/v1/drops/{id}
+func (h *DropsHandler) DeleteDropHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only DELETE method is allowed")
+		return
+	}
+
+	dropIDStr := r.PathValue("id") // Available in Go 1.22+
+	if dropIDStr == "" {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Drop ID is required in the path")
+		return
+	}
+
+	dropID, err := uuid.Parse(dropIDStr)
+	if err != nil {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Invalid Drop ID format: "+err.Error())
+		return
+	}
+
+	// Placeholder for UserID until proper auth is implemented.
+	// This ensures that a user can only delete their own drops.
+	userID := "default-user" // Placeholder
+	log.Printf("Attempting to delete drop with ID: %s for UserID: %s", dropID.String(), userID)
+
+	params := db.DeleteDropParams{
+		ID:     dropID,
+		UserID: sql.NullString{String: userID, Valid: true},
+	}
+
+	err = h.APIConfig.DB.DeleteDrop(r.Context(), params)
+	if err != nil {
+		// Note: A simple DELETE without RETURNING won't return sql.ErrNoRows if the item didn't exist.
+		// It will only return an error for actual execution problems.
+		// If we needed to confirm a row was deleted, we'd need a different approach (e.g., checking rows affected, or using RETURNING).
+		// For a DELETE operation, if no error occurs, it's generally considered successful from the client's perspective
+		// (the resource is gone or was already gone).
+		log.Printf("Error deleting drop from database: %v", err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete drop: "+err.Error())
+		return
+	}
+
+	log.Printf("Successfully deleted drop with ID: %s (or it did not exist for user %s)", dropID.String(), userID)
+	w.WriteHeader(http.StatusNoContent) // 204 No Content is standard for successful DELETE
 }

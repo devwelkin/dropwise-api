@@ -58,6 +58,21 @@ func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, e
 	return i, err
 }
 
+const deleteDrop = `-- name: DeleteDrop :exec
+DELETE FROM drops
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteDropParams struct {
+	ID     uuid.UUID
+	UserID sql.NullString
+}
+
+func (q *Queries) DeleteDrop(ctx context.Context, arg DeleteDropParams) error {
+	_, err := q.db.ExecContext(ctx, deleteDrop, arg.ID, arg.UserID)
+	return err
+}
+
 const getDrop = `-- name: GetDrop :one
 SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
 WHERE id = $1

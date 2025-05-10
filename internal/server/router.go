@@ -34,5 +34,8 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 	// PUT /api/v1/drops/{id} - Update a specific drop
 	mux.HandleFunc("PUT /api/v1/drops/{id}", dropsHandler.UpdateDropHandler)
 
+	// DELETE /api/v1/drops/{id} - Delete a specific drop
+	mux.HandleFunc("DELETE /api/v1/drops/{id}", dropsHandler.DeleteDropHandler)
+
 	return mux
 }
