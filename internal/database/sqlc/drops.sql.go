@@ -97,6 +97,58 @@ func (q *Queries) GetDrop(ctx context.Context, id uuid.UUID) (Drop, error) {
 	return i, err
 }
 
+const getDueDropsForUser = `-- name: GetDueDropsForUser :many
+SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+FROM drops
+WHERE user_id = $1
+  AND status = 'new'
+ORDER BY priority DESC, added_date ASC
+LIMIT $2
+`
+
+type GetDueDropsForUserParams struct {
+	UserID sql.NullString
+	Limit  int32
+}
+
+// Selects drops that are due to be sent for a specific user.
+// Drops are considered due if their status is 'new'.
+// They are ordered by priority (descending) and then by added_date (ascending).
+func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUserParams) ([]Drop, error) {
+	rows, err := q.db.QueryContext(ctx, getDueDropsForUser, arg.UserID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Drop
+	for rows.Next() {
+		var i Drop
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Topic,
+			&i.Url,
+			&i.UserNotes,
+			&i.AddedDate,
+			&i.UpdatedAt,
+			&i.Status,
+			&i.LastSentDate,
+			&i.SendCount,
+			&i.Priority,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDrops = `-- name: ListDrops :many
 SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
 WHERE user_id = $1
@@ -136,6 +188,42 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 		return nil, err
 	}
 	return items, nil
+}
+
+const markDropAsSent = `-- name: MarkDropAsSent :one
+UPDATE drops
+SET
+    status = 'sent',
+    last_sent_date = $2, -- $2 will be the timestamp when it was sent
+    send_count = send_count + 1
+    -- updated_at is handled by the database trigger
+WHERE id = $1 -- $1 will be the drop's ID
+RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+`
+
+type MarkDropAsSentParams struct {
+	ID           uuid.UUID
+	LastSentDate sql.NullTime
+}
+
+// Updates a drop's status to 'sent', sets the last_sent_date, and increments the send_count.
+func (q *Queries) MarkDropAsSent(ctx context.Context, arg MarkDropAsSentParams) (Drop, error) {
+	row := q.db.QueryRowContext(ctx, markDropAsSent, arg.ID, arg.LastSentDate)
+	var i Drop
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Topic,
+		&i.Url,
+		&i.UserNotes,
+		&i.AddedDate,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.LastSentDate,
+		&i.SendCount,
+		&i.Priority,
+	)
+	return i, err
 }
 
 const updateDrop = `-- name: UpdateDrop :one
