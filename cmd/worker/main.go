@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/twomotive/dropwise/internal/config"
-	"github.com/twomotive/dropwise/internal/worker"
+	"github.com/twomotive/dropwise/worker"
 )
 
 func main() {
