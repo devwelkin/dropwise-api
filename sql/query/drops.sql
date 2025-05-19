@@ -61,3 +61,10 @@ SET
     -- updated_at is handled by the database trigger
 WHERE id = $1 -- $1 will be the drop's ID
 RETURNING *;
+
+-- name: ListUsersWithDueDrops :many
+SELECT DISTINCT user_id
+FROM drops
+WHERE status = 'new'
+  AND user_id IS NOT NULL
+  AND user_id != '';
