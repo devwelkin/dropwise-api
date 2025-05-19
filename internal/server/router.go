@@ -5,16 +5,17 @@ import (
 
 	"github.com/twomotive/dropwise/internal/config"
 	"github.com/twomotive/dropwise/internal/handlers"
-	"github.com/twomotive/dropwise/internal/server/httputils" // Though not directly used here, good to keep for consistency if middleware is added
+	"github.com/twomotive/dropwise/internal/server/httputils"
 )
 
-// NewRouter creates and configures a new HTTP ServeMux with all application routes.
+// NewRouter creates and newServeMux with all application routes.
 func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Initialize handlers
 	dropsHandler := handlers.NewDropsHandler(apiCfg)
 	tagsHandler := handlers.NewTagsHandler(apiCfg)
+	authHandler := handlers.NewAuthHandler(apiCfg) // New Auth Handler
 
 	// --- Route Definitions ---
 
@@ -23,6 +24,11 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 		httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"status": "API is running"})
 	})
 
+	// --- Authentication Endpoints ---
+	mux.HandleFunc("POST /api/v1/auth/register", authHandler.RegisterHandler)
+	mux.HandleFunc("POST /api/v1/auth/login", authHandler.LoginHandler)
+
+	// --- Drop Endpoints ---
 	// POST /api/v1/drops - Create a new drop
 	mux.HandleFunc("POST /api/v1/drops", dropsHandler.CreateDropHandler)
 
