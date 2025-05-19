@@ -51,6 +51,13 @@ type UserResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// LoginResponse defines the response body for a successful login.
+type LoginResponse struct {
+	Token  string    `json:"token"`
+	UserID uuid.UUID `json:"user_id"`
+	Email  string    `json:"email"`
+}
+
 // Helper to convert db.CreateUserRow to UserResponse
 func toUserResponseFromCreate(dbUser db.CreateUserRow) UserResponse {
 	return UserResponse{
@@ -186,9 +193,21 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Login successful
-	// For Phase 1, we just return a success message.
-	// Phase 2 will involve JWT generation here.
-	log.Printf("User %s (ID: %s) logged in successfully", user.Email, user.ID)
-	httputils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Login successful", "user_id": user.ID.String()})
+	// Login successful, generate JWT
+	log.Printf("User %s (ID: %s) credentials verified. Generating JWT.", user.Email, user.ID)
+
+	tokenString, err := auth.GenerateJWT(user.ID, h.APIConfig.JWTSecret, h.APIConfig.JWTExpiration)
+	if err != nil {
+		log.Printf("Error generating JWT for user %s (ID: %s): %v", user.Email, user.ID, err)
+		httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to generate authentication token")
+		return
+	}
+
+	log.Printf("JWT generated successfully for user %s (ID: %s)", user.Email, user.ID)
+	response := LoginResponse{
+		Token:  tokenString,
+		UserID: user.ID,
+		Email:  user.Email,
+	}
+	httputils.RespondWithJSON(w, http.StatusOK, response)
 }
