@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/twomotive/dropwise/internal/config"
@@ -15,8 +16,14 @@ func main() {
 		log.Fatalf("Error loading configuration for worker: %v", err)
 	}
 
-	// Call the worker function to process due drops
-	worker.ProcessDueDrops(cfg)
+	// Call the core worker logic directly for command-line simulation
+	// Pass a background context
+	processedCount, err := worker.ProcessDropsLogic(context.Background(), cfg)
+	if err != nil {
+		log.Printf("Worker simulation finished with error: %v", err)
+	} else {
+		log.Printf("Worker simulation finished. Drops processed: %d", processedCount)
+	}
 
 	log.Println("Dropwise Worker Process (Simulation) finished.")
 }

@@ -190,6 +190,37 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 	return items, nil
 }
 
+const listUsersWithDueDrops = `-- name: ListUsersWithDueDrops :many
+SELECT DISTINCT user_id
+FROM drops
+WHERE status = 'new'
+  AND user_id IS NOT NULL
+  AND user_id != ''
+`
+
+func (q *Queries) ListUsersWithDueDrops(ctx context.Context) ([]sql.NullString, error) {
+	rows, err := q.db.QueryContext(ctx, listUsersWithDueDrops)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []sql.NullString
+	for rows.Next() {
+		var user_id sql.NullString
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markDropAsSent = `-- name: MarkDropAsSent :one
 UPDATE drops
 SET
