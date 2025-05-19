@@ -22,7 +22,7 @@ INSERT INTO drops (
 ) VALUES (
     $1, $2, $3, $4, $5
 )
-RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
 `
 
 type CreateDropParams struct {
@@ -54,6 +54,7 @@ func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, e
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
+		&i.UserUuid,
 	)
 	return i, err
 }
@@ -74,7 +75,7 @@ func (q *Queries) DeleteDrop(ctx context.Context, arg DeleteDropParams) error {
 }
 
 const getDrop = `-- name: GetDrop :one
-SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
+SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid FROM drops
 WHERE id = $1
 `
 
@@ -93,12 +94,13 @@ func (q *Queries) GetDrop(ctx context.Context, id uuid.UUID) (Drop, error) {
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
+		&i.UserUuid,
 	)
 	return i, err
 }
 
 const getDueDropsForUser = `-- name: GetDueDropsForUser :many
-SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
 FROM drops
 WHERE user_id = $1
   AND status = 'new'
@@ -135,6 +137,7 @@ func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUser
 			&i.LastSentDate,
 			&i.SendCount,
 			&i.Priority,
+			&i.UserUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -150,7 +153,7 @@ func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUser
 }
 
 const listDrops = `-- name: ListDrops :many
-SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
+SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid FROM drops
 WHERE user_id = $1
 ORDER BY added_date DESC
 `
@@ -176,6 +179,7 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 			&i.LastSentDate,
 			&i.SendCount,
 			&i.Priority,
+			&i.UserUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -229,7 +233,7 @@ SET
     send_count = send_count + 1
     -- updated_at is handled by the database trigger
 WHERE id = $1 -- $1 will be the drop's ID
-RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
 `
 
 type MarkDropAsSentParams struct {
@@ -253,6 +257,7 @@ func (q *Queries) MarkDropAsSent(ctx context.Context, arg MarkDropAsSentParams) 
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
+		&i.UserUuid,
 	)
 	return i, err
 }
@@ -267,7 +272,7 @@ SET
     status = COALESCE($7, status)
     -- updated_at is handled by the database trigger
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
+RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
 `
 
 type UpdateDropParams struct {
@@ -303,6 +308,7 @@ func (q *Queries) UpdateDrop(ctx context.Context, arg UpdateDropParams) (Drop, e
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
+		&i.UserUuid,
 	)
 	return i, err
 }

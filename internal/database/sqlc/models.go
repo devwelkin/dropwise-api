@@ -23,6 +23,7 @@ type Drop struct {
 	LastSentDate sql.NullTime
 	SendCount    int32
 	Priority     sql.NullInt32
+	UserUuid     uuid.NullUUID
 }
 
 type DropsItemTag struct {
@@ -33,4 +34,12 @@ type DropsItemTag struct {
 type Tag struct {
 	ID   int32
 	Name string
+}
+
+type User struct {
+	ID             uuid.UUID
+	Email          string
+	HashedPassword string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
