@@ -87,10 +87,14 @@ func GetDBQueries() (*db.Queries, error) {
 // LoadConfig loads configuration from environment variables and returns an APIConfig.
 // It now uses the globally initialized database connection.
 func LoadConfig() (*APIConfig, error) {
-	// Ensure environment variables are loaded (godotenv.Load is idempotent if called multiple times,
-	// but initializeGlobalDB also calls it).
-	// If there are other non-DB configs to load from .env, ensure it's accessible here.
-	// For simplicity, we assume initializeGlobalDB handles .env loading sufficiently for DB_URL.
+	// Attempt to load .env file. It's okay if it doesn't exist,
+	// as environment variables might be set directly.
+	// godotenv.Load is idempotent, so calling it here and in initializeGlobalDB is fine.
+	if err := godotenv.Load(); err != nil {
+		// Log or handle the error if .env is critical and not found,
+		// but often we proceed if vars are set externally.
+		fmt.Println("No .env file found or error loading it, relying on environment variables.")
+	}
 
 	port := os.Getenv("PORT")
 	// PORT might not be set or relevant for worker, handle as needed.
