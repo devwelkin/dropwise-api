@@ -13,7 +13,7 @@ import (
 
 type Drop struct {
 	ID           uuid.UUID
-	UserID       sql.NullString
+	UserUuid     uuid.NullUUID
 	Topic        string
 	Url          string
 	UserNotes    sql.NullString
@@ -23,7 +23,6 @@ type Drop struct {
 	LastSentDate sql.NullTime
 	SendCount    int32
 	Priority     sql.NullInt32
-	UserUuid     uuid.NullUUID
 }
 
 type DropsItemTag struct {

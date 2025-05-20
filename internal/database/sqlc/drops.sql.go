@@ -14,7 +14,7 @@ import (
 
 const createDrop = `-- name: CreateDrop :one
 INSERT INTO drops (
-    user_id,
+    user_uuid, -- Changed from user_id
     topic,
     url,
     user_notes,
@@ -22,11 +22,11 @@ INSERT INTO drops (
 ) VALUES (
     $1, $2, $3, $4, $5
 )
-RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
+RETURNING id, user_uuid, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
 `
 
 type CreateDropParams struct {
-	UserID    sql.NullString
+	UserUuid  uuid.NullUUID
 	Topic     string
 	Url       string
 	UserNotes sql.NullString
@@ -35,7 +35,7 @@ type CreateDropParams struct {
 
 func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, error) {
 	row := q.db.QueryRowContext(ctx, createDrop,
-		arg.UserID,
+		arg.UserUuid,
 		arg.Topic,
 		arg.Url,
 		arg.UserNotes,
@@ -44,7 +44,7 @@ func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, e
 	var i Drop
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.Topic,
 		&i.Url,
 		&i.UserNotes,
@@ -54,28 +54,27 @@ func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, e
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
-		&i.UserUuid,
 	)
 	return i, err
 }
 
 const deleteDrop = `-- name: DeleteDrop :exec
 DELETE FROM drops
-WHERE id = $1 AND user_id = $2
+WHERE id = $1 AND user_uuid = $2
 `
 
 type DeleteDropParams struct {
-	ID     uuid.UUID
-	UserID sql.NullString
+	ID       uuid.UUID
+	UserUuid uuid.NullUUID
 }
 
 func (q *Queries) DeleteDrop(ctx context.Context, arg DeleteDropParams) error {
-	_, err := q.db.ExecContext(ctx, deleteDrop, arg.ID, arg.UserID)
+	_, err := q.db.ExecContext(ctx, deleteDrop, arg.ID, arg.UserUuid)
 	return err
 }
 
 const getDrop = `-- name: GetDrop :one
-SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid FROM drops
+SELECT id, user_uuid, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
 WHERE id = $1
 `
 
@@ -84,7 +83,7 @@ func (q *Queries) GetDrop(ctx context.Context, id uuid.UUID) (Drop, error) {
 	var i Drop
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.Topic,
 		&i.Url,
 		&i.UserNotes,
@@ -94,30 +93,29 @@ func (q *Queries) GetDrop(ctx context.Context, id uuid.UUID) (Drop, error) {
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
-		&i.UserUuid,
 	)
 	return i, err
 }
 
-const getDueDropsForUser = `-- name: GetDueDropsForUser :many
-SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
+const getDueDropsByUserUUID = `-- name: GetDueDropsByUserUUID :many
+SELECT id, user_uuid, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
 FROM drops
-WHERE user_id = $1
+WHERE user_uuid = $1 -- Changed from user_id
   AND status = 'new'
 ORDER BY priority DESC, added_date ASC
 LIMIT $2
 `
 
-type GetDueDropsForUserParams struct {
-	UserID sql.NullString
-	Limit  int32
+type GetDueDropsByUserUUIDParams struct {
+	UserUuid uuid.NullUUID
+	Limit    int32
 }
 
 // Selects drops that are due to be sent for a specific user.
 // Drops are considered due if their status is 'new'.
 // They are ordered by priority (descending) and then by added_date (ascending).
-func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUserParams) ([]Drop, error) {
-	rows, err := q.db.QueryContext(ctx, getDueDropsForUser, arg.UserID, arg.Limit)
+func (q *Queries) GetDueDropsByUserUUID(ctx context.Context, arg GetDueDropsByUserUUIDParams) ([]Drop, error) {
+	rows, err := q.db.QueryContext(ctx, getDueDropsByUserUUID, arg.UserUuid, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +125,7 @@ func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUser
 		var i Drop
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
+			&i.UserUuid,
 			&i.Topic,
 			&i.Url,
 			&i.UserNotes,
@@ -137,7 +135,6 @@ func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUser
 			&i.LastSentDate,
 			&i.SendCount,
 			&i.Priority,
-			&i.UserUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -152,14 +149,14 @@ func (q *Queries) GetDueDropsForUser(ctx context.Context, arg GetDueDropsForUser
 	return items, nil
 }
 
-const listDrops = `-- name: ListDrops :many
-SELECT id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid FROM drops
-WHERE user_id = $1
+const listDropsByUserUUID = `-- name: ListDropsByUserUUID :many
+SELECT id, user_uuid, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority FROM drops
+WHERE user_uuid = $1 -- Changed from user_id
 ORDER BY added_date DESC
 `
 
-func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop, error) {
-	rows, err := q.db.QueryContext(ctx, listDrops, userID)
+func (q *Queries) ListDropsByUserUUID(ctx context.Context, userUuid uuid.NullUUID) ([]Drop, error) {
+	rows, err := q.db.QueryContext(ctx, listDropsByUserUUID, userUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +166,7 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 		var i Drop
 		if err := rows.Scan(
 			&i.ID,
-			&i.UserID,
+			&i.UserUuid,
 			&i.Topic,
 			&i.Url,
 			&i.UserNotes,
@@ -179,7 +176,6 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 			&i.LastSentDate,
 			&i.SendCount,
 			&i.Priority,
-			&i.UserUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -194,27 +190,26 @@ func (q *Queries) ListDrops(ctx context.Context, userID sql.NullString) ([]Drop,
 	return items, nil
 }
 
-const listUsersWithDueDrops = `-- name: ListUsersWithDueDrops :many
-SELECT DISTINCT user_id
+const listUserUUIDsWithDueDrops = `-- name: ListUserUUIDsWithDueDrops :many
+SELECT DISTINCT user_uuid -- Changed from user_id
 FROM drops
 WHERE status = 'new'
-  AND user_id IS NOT NULL
-  AND user_id != ''
+  AND user_uuid IS NOT NULL
 `
 
-func (q *Queries) ListUsersWithDueDrops(ctx context.Context) ([]sql.NullString, error) {
-	rows, err := q.db.QueryContext(ctx, listUsersWithDueDrops)
+func (q *Queries) ListUserUUIDsWithDueDrops(ctx context.Context) ([]uuid.NullUUID, error) {
+	rows, err := q.db.QueryContext(ctx, listUserUUIDsWithDueDrops)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []sql.NullString
+	var items []uuid.NullUUID
 	for rows.Next() {
-		var user_id sql.NullString
-		if err := rows.Scan(&user_id); err != nil {
+		var user_uuid uuid.NullUUID
+		if err := rows.Scan(&user_uuid); err != nil {
 			return nil, err
 		}
-		items = append(items, user_id)
+		items = append(items, user_uuid)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -233,7 +228,7 @@ SET
     send_count = send_count + 1
     -- updated_at is handled by the database trigger
 WHERE id = $1 -- $1 will be the drop's ID
-RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
+RETURNING id, user_uuid, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
 `
 
 type MarkDropAsSentParams struct {
@@ -247,7 +242,7 @@ func (q *Queries) MarkDropAsSent(ctx context.Context, arg MarkDropAsSentParams) 
 	var i Drop
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.Topic,
 		&i.Url,
 		&i.UserNotes,
@@ -257,7 +252,6 @@ func (q *Queries) MarkDropAsSent(ctx context.Context, arg MarkDropAsSentParams) 
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
-		&i.UserUuid,
 	)
 	return i, err
 }
@@ -271,13 +265,13 @@ SET
     priority = COALESCE($6, priority),
     status = COALESCE($7, status)
     -- updated_at is handled by the database trigger
-WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority, user_uuid
+WHERE id = $1 AND user_uuid = $2 -- Changed from user_id
+RETURNING id, user_uuid, topic, url, user_notes, added_date, updated_at, status, last_sent_date, send_count, priority
 `
 
 type UpdateDropParams struct {
 	ID        uuid.UUID
-	UserID    sql.NullString
+	UserUuid  uuid.NullUUID
 	Topic     sql.NullString
 	Url       sql.NullString
 	UserNotes sql.NullString
@@ -288,7 +282,7 @@ type UpdateDropParams struct {
 func (q *Queries) UpdateDrop(ctx context.Context, arg UpdateDropParams) (Drop, error) {
 	row := q.db.QueryRowContext(ctx, updateDrop,
 		arg.ID,
-		arg.UserID,
+		arg.UserUuid,
 		arg.Topic,
 		arg.Url,
 		arg.UserNotes,
@@ -298,7 +292,7 @@ func (q *Queries) UpdateDrop(ctx context.Context, arg UpdateDropParams) (Drop, e
 	var i Drop
 	err := row.Scan(
 		&i.ID,
-		&i.UserID,
+		&i.UserUuid,
 		&i.Topic,
 		&i.Url,
 		&i.UserNotes,
@@ -308,7 +302,6 @@ func (q *Queries) UpdateDrop(ctx context.Context, arg UpdateDropParams) (Drop, e
 		&i.LastSentDate,
 		&i.SendCount,
 		&i.Priority,
-		&i.UserUuid,
 	)
 	return i, err
 }

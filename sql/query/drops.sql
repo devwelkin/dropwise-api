@@ -1,6 +1,6 @@
 -- name: CreateDrop :one
 INSERT INTO drops (
-    user_id,
+    user_uuid, -- Changed from user_id
     topic,
     url,
     user_notes,
@@ -16,9 +16,9 @@ SELECT * FROM drops
 WHERE id = $1;
 
 
--- name: ListDrops :many
+-- name: ListDropsByUserUUID :many
 SELECT * FROM drops
-WHERE user_id = $1
+WHERE user_uuid = $1 -- Changed from user_id
 ORDER BY added_date DESC;
 
 
@@ -31,22 +31,22 @@ SET
     priority = COALESCE(sqlc.narg('priority'), priority),
     status = COALESCE(sqlc.narg('status'), status)
     -- updated_at is handled by the database trigger
-WHERE id = $1 AND user_id = $2
+WHERE id = $1 AND user_uuid = $2 -- Changed from user_id
 RETURNING *;
 
 
 -- name: DeleteDrop :exec
 DELETE FROM drops
-WHERE id = $1 AND user_id = $2;
+WHERE id = $1 AND user_uuid = $2;
 
 
--- name: GetDueDropsForUser :many
+-- name: GetDueDropsByUserUUID :many
 -- Selects drops that are due to be sent for a specific user.
 -- Drops are considered due if their status is 'new'.
 -- They are ordered by priority (descending) and then by added_date (ascending).
 SELECT *
 FROM drops
-WHERE user_id = $1
+WHERE user_uuid = $1 -- Changed from user_id
   AND status = 'new'
 ORDER BY priority DESC, added_date ASC
 LIMIT $2;
@@ -62,9 +62,8 @@ SET
 WHERE id = $1 -- $1 will be the drop's ID
 RETURNING *;
 
--- name: ListUsersWithDueDrops :many
-SELECT DISTINCT user_id
+-- name: ListUserUUIDsWithDueDrops :many
+SELECT DISTINCT user_uuid -- Changed from user_id
 FROM drops
 WHERE status = 'new'
-  AND user_id IS NOT NULL
-  AND user_id != '';
+  AND user_uuid IS NOT NULL; -- Simplified condition for UUID

@@ -13,7 +13,7 @@ import (
 	"github.com/twomotive/dropwise/internal/server/httputils"
 )
 
-// ProcessDropsLogic contains the core logic for fetching and "sending" due drops.
+// / ProcessDropsLogic contains the core logic for fetching and "sending" due drops.
 // It now fetches distinct users with due drops and processes one drop per user.
 // It returns the total number of drops processed and any critical error encountered during the overall process.
 func ProcessDropsLogic(ctx context.Context, apiCfg *config.APIConfig) (totalProcessedCount int, err error) {
@@ -21,63 +21,62 @@ func ProcessDropsLogic(ctx context.Context, apiCfg *config.APIConfig) (totalProc
 	totalProcessedCount = 0
 	overallSuccess := true // Tracks if any non-critical error occurred
 
-	// Step 1: Get all distinct user IDs with 'new' drops
-	// sqlc generates ListUsersWithDueDrops to return []sql.NullString
-	userIDs, err := apiCfg.DB.ListUsersWithDueDrops(ctx)
+	// Step 1: Get all distinct user UUIDs with 'new' drops
+	userUUIDs, err := apiCfg.DB.ListUserUUIDsWithDueDrops(ctx)
 	if err != nil {
 		log.Printf("WorkerLogic: Critical error fetching users with due drops: %v", err)
 		return 0, fmt.Errorf("failed to fetch users with due drops: %w", err) // Stop if we can't get the user list
 	}
 
-	if len(userIDs) == 0 {
+	if len(userUUIDs) == 0 {
 		log.Println("WorkerLogic: No users found with due drops at this time.")
 		return 0, nil
 	}
 
-	log.Printf("WorkerLogic: Found %d distinct user identifier(s) with due drops.", len(userIDs))
+	log.Printf("WorkerLogic: Found %d distinct user identifier(s) with due drops.", len(userUUIDs))
 
-	// Step 2: Loop through each user ID
-	for _, userIDNullString := range userIDs {
-		if !userIDNullString.Valid || userIDNullString.String == "" {
-			log.Println("WorkerLogic: Skipping invalid or empty user ID from ListUsersWithDueDrops.")
+	// Step 2: Loop through each user UUID
+	for _, userUUID := range userUUIDs {
+		if !userUUID.Valid {
+			log.Println("WorkerLogic: Skipping invalid or empty user UUID from ListUserUUIDsWithDueDrops.")
 			continue
 		}
-		currentUserID := userIDNullString.String
+		currentUserUUID := userUUID
 
-		log.Printf("WorkerLogic: Checking for due drops for user: %s", currentUserID)
+		log.Printf("WorkerLogic: Checking for due drops for user: %s", currentUserUUID.UUID.String())
 
 		// Step 2a: Get one due drop for the current user
-		getParams := db.GetDueDropsForUserParams{
-			UserID: sql.NullString{String: currentUserID, Valid: true},
-			Limit:  1, // Process one drop per user per run
+		getParams := db.GetDueDropsByUserUUIDParams{
+			UserUuid: currentUserUUID,
+			Limit:    1, // Process one drop per user per run
 		}
 
-		dueDrops, err := apiCfg.DB.GetDueDropsForUser(ctx, getParams)
+		dueDrops, err := apiCfg.DB.GetDueDropsByUserUUID(ctx, getParams)
 		if err != nil {
-			log.Printf("WorkerLogic: Error fetching due drops for user %s: %v", currentUserID, err)
+			log.Printf("WorkerLogic: Error fetching due drops for user %s: %v", currentUserUUID.UUID.String(), err)
 			overallSuccess = false
 			continue // Move to the next user
 		}
 
 		if len(dueDrops) == 0 {
-			// This case should ideally not happen if ListUsersWithDueDrops returned this user,
+			// This case should ideally not happen if ListUserUUIDsWithDueDrops returned this user,
 			// but it's a good safeguard (e.g., if a drop was processed/deleted by another instance).
-			log.Printf("WorkerLogic: No due drops found for user %s at this time (unexpected after listing).", currentUserID)
+			log.Printf("WorkerLogic: No due drops found for user %s at this time (unexpected after listing).", currentUserUUID.UUID.String())
 			continue // Move to the next user
 		}
 
 		// Process the first due drop found
 		dueDrop := dueDrops[0]
 		log.Printf("WorkerLogic: Found due drop for user %s: ID=%s, Topic='%s', URL='%s'",
-			currentUserID, dueDrop.ID.String(), dueDrop.Topic, dueDrop.Url)
+			currentUserUUID.UUID.String(), dueDrop.ID.String(), dueDrop.Topic, dueDrop.Url)
 
 		// Step 2b: Simulate sending the drop (placeholder for actual email logic)
-		log.Printf("WorkerLogic: Simulating sending drop ID %s (Topic: %s) to user %s...", dueDrop.ID.String(), dueDrop.Topic, currentUserID)
+		log.Printf("WorkerLogic: Simulating sending drop ID %s (Topic: %s) to user %s...", dueDrop.ID.String(), dueDrop.Topic, currentUserUUID.UUID.String())
 		// In a real scenario, you might have a function like:
 		// emailSent, err := emailService.SendDropReminder(currentUserID, dueDrop)
 		// For now, we simulate success.
 		time.Sleep(500 * time.Millisecond) // Reduced sleep time for faster batch processing simulation
-		log.Printf("WorkerLogic: Drop ID %s (Topic: %s) 'sent' successfully to user %s (simulation).", dueDrop.ID.String(), dueDrop.Topic, currentUserID)
+		log.Printf("WorkerLogic: Drop ID %s (Topic: %s) 'sent' successfully to user %s (simulation).", dueDrop.ID.String(), dueDrop.Topic, currentUserUUID.UUID.String())
 
 		// Step 2c: Mark the drop as sent
 		markParams := db.MarkDropAsSentParams{
@@ -87,14 +86,14 @@ func ProcessDropsLogic(ctx context.Context, apiCfg *config.APIConfig) (totalProc
 
 		updatedDrop, err := apiCfg.DB.MarkDropAsSent(ctx, markParams)
 		if err != nil {
-			log.Printf("WorkerLogic: Error marking drop ID %s as sent for user %s: %v", dueDrop.ID.String(), currentUserID, err)
+			log.Printf("WorkerLogic: Error marking drop ID %s as sent for user %s: %v", dueDrop.ID.String(), currentUserUUID.UUID.String(), err)
 			overallSuccess = false
 			// Continue to next user, but this drop processing failed after "sending"
 			continue
 		}
 
 		log.Printf("WorkerLogic: Successfully marked drop ID %s as sent for user %s. New status: %s, Send count: %d, Last sent: %v",
-			updatedDrop.ID.String(), currentUserID, updatedDrop.Status, updatedDrop.SendCount, updatedDrop.LastSentDate.Time)
+			updatedDrop.ID.String(), currentUserUUID.UUID.String(), updatedDrop.Status, updatedDrop.SendCount, updatedDrop.LastSentDate.Time)
 		totalProcessedCount++
 	}
 
