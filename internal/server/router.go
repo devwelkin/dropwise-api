@@ -31,7 +31,7 @@ func NewRouter(apiCfg *config.APIConfig) *http.ServeMux {
 
 	// --- Authentication Endpoints ---
 	// These endpoints don't need authentication but should be logged
-	mux.HandleFunc("POST /api/v1/auth/register", middleware.ApplyMiddleware(authHandler.RegisterHandler, loggingMiddleware))
+	mux.HandleFunc("POST /api/v1/auth/signup", middleware.ApplyMiddleware(authHandler.SignupHandler, loggingMiddleware))
 	mux.HandleFunc("POST /api/v1/auth/login", middleware.ApplyMiddleware(authHandler.LoginHandler, loggingMiddleware))
 
 	// --- Drop Endpoints ---

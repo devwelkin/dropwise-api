@@ -28,8 +28,8 @@ func NewAuthHandler(apiCfg *config.APIConfig) *AuthHandler {
 
 // --- Request Structs ---
 
-// RegisterUserRequest defines the expected request body for user registration.
-type RegisterUserRequest struct {
+// SignupUserRequest defines the expected request body for user registration.
+type SignupUserRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
@@ -70,15 +70,15 @@ func toUserResponseFromCreate(dbUser db.CreateUserRow) UserResponse {
 
 // --- Handler Implementations ---
 
-// RegisterHandler handles new user registration.
-// POST /api/v1/auth/register
-func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
+// SignupHandler handles new user registration.
+// POST /api/v1/auth/signup
+func (h *AuthHandler) SignupHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only POST method is allowed")
 		return
 	}
 
-	var req RegisterUserRequest
+	var req SignupUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
@@ -98,7 +98,7 @@ func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Attempting to register user with email: %s", req.Email)
+	log.Printf("Attempting to signup user with email: %s", req.Email)
 
 	// Check if user already exists
 	_, err := h.APIConfig.DB.GetUserByEmail(r.Context(), req.Email)
@@ -140,7 +140,7 @@ func (h *AuthHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Successfully registered user with email: %s, ID: %s", createdUserRow.Email, createdUserRow.ID)
+	log.Printf("Successfully signed up user with email: %s, ID: %s", createdUserRow.Email, createdUserRow.ID)
 	response := toUserResponseFromCreate(createdUserRow)
 	httputils.RespondWithJSON(w, http.StatusCreated, response)
 }
