@@ -1,7 +1,8 @@
+
 -- +goose Up
 CREATE TABLE drops (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Automatically generate UUID
-    user_id VARCHAR(255), -- For future multi-tenancy
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_uuid UUID NULL, -- Changed from user_id VARCHAR(255), allowing NULL for now
     topic TEXT NOT NULL,
     url TEXT NOT NULL,
     user_notes TEXT,
@@ -13,7 +14,8 @@ CREATE TABLE drops (
     priority INTEGER DEFAULT 0
 );
 
-CREATE INDEX idx_drops_user_status ON drops (user_id, status);
+-- Changed index to use user_uuid
+CREATE INDEX idx_drops_user_uuid_status ON drops (user_uuid, status);
 CREATE INDEX idx_drops_status_last_sent ON drops (status, last_sent_date);
 
 CREATE TABLE tags (
@@ -51,4 +53,4 @@ DROP TRIGGER IF EXISTS update_drops_updated_at ON drops;
 DROP FUNCTION IF EXISTS update_updated_at_column();
 DROP TABLE IF EXISTS drops_item_tags;
 DROP TABLE IF EXISTS tags;
-DROP TABLE IF EXISTS drops;
+DROP TABLE IF EXISTS drops; -- This will also drop idx_drops_user_uuid_status and idx_drops_status_last_sent

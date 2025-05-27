@@ -13,7 +13,7 @@ import (
 
 type Drop struct {
 	ID           uuid.UUID
-	UserID       sql.NullString
+	UserUuid     uuid.NullUUID
 	Topic        string
 	Url          string
 	UserNotes    sql.NullString
@@ -33,4 +33,12 @@ type DropsItemTag struct {
 type Tag struct {
 	ID   int32
 	Name string
+}
+
+type User struct {
+	ID             uuid.UUID
+	Email          string
+	HashedPassword string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
