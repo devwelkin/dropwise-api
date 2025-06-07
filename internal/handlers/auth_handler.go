@@ -166,6 +166,12 @@ func (h *AuthHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		httputils.RespondWithError(w, http.StatusBadRequest, "Email is required")
 		return
 	}
+	// A more robust email validation might use a regex or a specialized library,
+	// but for now, checking for non-empty and presence of "@" is a basic step.
+	if !strings.Contains(req.Email, "@") {
+		httputils.RespondWithError(w, http.StatusBadRequest, "Valid email format is required")
+		return
+	}
 	if req.Password == "" {
 		httputils.RespondWithError(w, http.StatusBadRequest, "Password is required")
 		return

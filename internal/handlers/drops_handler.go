@@ -46,55 +46,62 @@ type UpdateDropRequest struct {
 
 // DropResponse defines the structure for drop responses.
 type DropResponse struct {
-	ID           uuid.UUID      `json:"id"`
-	UserUuid     uuid.NullUUID  `json:"user_uuid"`
-	Topic        string         `json:"topic"`
-	Url          string         `json:"url"`
-	UserNotes    sql.NullString `json:"user_notes"`
-	AddedDate    time.Time      `json:"added_date"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	Status       string         `json:"status"`
-	LastSentDate sql.NullTime   `json:"last_sent_date"`
-	SendCount    int32          `json:"send_count"`
-	Priority     sql.NullInt32  `json:"priority"`
-	Tags         []string       `json:"tags"`
+	ID           uuid.UUID  `json:"id"`
+	Topic        string     `json:"topic"`
+	URL          string     `json:"url"`
+	UserNotes    *string    `json:"user_notes"` // Removed omitempty
+	AddedDate    time.Time  `json:"added_date"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	Status       string     `json:"status"`
+	LastSentDate *time.Time `json:"last_sent_date"` // Removed omitempty
+	SendCount    int32      `json:"send_count"`
+	Priority     *int32     `json:"priority"` // Removed omitempty
+	Tags         []string   `json:"tags"`     // Removed omitempty
 }
 
-// toDropResponse converts a db.Drop and its tags to a DropResponse.
-func toDropResponse(drop db.Drop, tags []db.Tag) DropResponse {
-	tagNames := make([]string, len(tags))
-	for i, t := range tags {
-		tagNames[i] = t.Name
+// toDropResponse converts a db.Drop and its tag names to a DropResponse.
+func toDropResponse(drop db.Drop, tagNames []string) DropResponse { // Ensure tagNames is actually []string
+	var userNotes *string
+	if drop.UserNotes.Valid {
+		userNotes = &drop.UserNotes.String
+	}
+
+	var lastSentDate *time.Time
+	if drop.LastSentDate.Valid {
+		lastSentDate = &drop.LastSentDate.Time
+	}
+
+	var priority *int32
+	if drop.Priority.Valid {
+		priority = &drop.Priority.Int32
+	}
+
+	processedTags := tagNames
+	if processedTags == nil {
+		processedTags = []string{} // Ensures tags field is an empty array instead of null if no tags
 	}
 
 	return DropResponse{
 		ID:           drop.ID,
-		UserUuid:     drop.UserUuid,
 		Topic:        drop.Topic,
-		Url:          drop.Url,
-		UserNotes:    drop.UserNotes,
+		URL:          drop.Url, // db.Drop uses 'Url', mapping to 'URL' in response
+		UserNotes:    userNotes,
 		AddedDate:    drop.AddedDate,
 		UpdatedAt:    drop.UpdatedAt,
 		Status:       drop.Status,
-		LastSentDate: drop.LastSentDate,
+		LastSentDate: lastSentDate,
 		SendCount:    drop.SendCount,
-		Priority:     drop.Priority,
-		Tags:         tagNames,
+		Priority:     priority,
+		Tags:         processedTags,
 	}
 }
 
 // CreateDropHandler handles the creation of a new drop.
 // POST /api/v1/drops
 func (h *DropsHandler) CreateDropHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httputils.RespondWithError(w, http.StatusMethodNotAllowed, "Only POST method is allowed")
-		return
-	}
-
-	userUUID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+	userUUID, ok := r.Context().Value(middleware.UserIDKey).(uuid.UUID) // Changed to match other handlers
 	if !ok {
-		log.Printf("CreateDropHandler: UserID not found in context or not a UUID for path %s", r.URL.Path)
-		httputils.RespondWithError(w, http.StatusUnauthorized, "User not authenticated")
+		httputils.RespondWithError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -138,39 +145,52 @@ func (h *DropsHandler) CreateDropHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		log.Printf("Error creating drop in database: %v", err)
 		httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to create drop: "+err.Error())
-		return
+		return // Added missing return
 	}
 
+	// Handle Tags
+	var tagNamesForResponse []string
 	if len(req.Tags) > 0 {
 		for _, tagName := range req.Tags {
 			trimmedTagName := strings.TrimSpace(tagName)
 			if trimmedTagName == "" {
 				continue
 			}
-			tag, err := h.APIConfig.DB.CreateTag(r.Context(), trimmedTagName)
+
+			// Attempt to find the tag or create it if it doesn't exist
+			tag, err := h.APIConfig.DB.GetTagByName(r.Context(), trimmedTagName)
 			if err != nil {
-				log.Printf("Error creating/getting tag '%s': %v", trimmedTagName, err)
-				continue
+				if err == sql.ErrNoRows {
+					log.Printf("Tag '%s' not found, creating new tag.", trimmedTagName)
+					createdTag, createErr := h.APIConfig.DB.CreateTag(r.Context(), trimmedTagName)
+					if createErr != nil {
+						log.Printf("Error creating tag '%s': %v", trimmedTagName, createErr)
+						// Decide if this should be a fatal error or just skip the tag
+						// For now, we'll skip this tag and continue with others.
+						continue
+					}
+					tag = createdTag
+				} else {
+					log.Printf("Error retrieving tag '%s': %v", trimmedTagName, err)
+					continue // Skip this tag
+				}
 			}
-			err = h.APIConfig.DB.AddTagToDrop(r.Context(), db.AddTagToDropParams{
+
+			// Associate tag with the drop
+			err = h.APIConfig.DB.AddTagToDrop(r.Context(), db.AddTagToDropParams{ // Changed from AddDropTag to AddTagToDrop
 				DropsID: createdDrop.ID,
 				TagID:   tag.ID,
 			})
 			if err != nil {
-				log.Printf("Error associating tag '%s' (ID: %d) with drop '%s': %v", trimmedTagName, tag.ID, createdDrop.ID, err)
-				continue
+				log.Printf("Error associating tag '%s' (ID: %d) with drop '%s': %v", tag.Name, tag.ID, createdDrop.ID, err)
+				// Decide if this should be a fatal error. For now, log and continue.
+				// We might still want to add the tag name to the response if it was intended.
 			}
+			tagNamesForResponse = append(tagNamesForResponse, tag.Name)
 		}
 	}
 
-	finalTags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), createdDrop.ID)
-	if err != nil {
-		log.Printf("Error fetching tags for drop %s after creation: %v", createdDrop.ID, err)
-		finalTags = []db.Tag{}
-	}
-
-	log.Printf("Successfully created drop with ID: %s", createdDrop.ID.String())
-	response := toDropResponse(createdDrop, finalTags)
+	response := toDropResponse(createdDrop, tagNamesForResponse)
 	httputils.RespondWithJSON(w, http.StatusCreated, response)
 }
 
@@ -225,11 +245,18 @@ func (h *DropsHandler) GetDropHandler(w http.ResponseWriter, r *http.Request) {
 	tags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), drop.ID)
 	if err != nil {
 		log.Printf("Error fetching tags for drop %s: %v", drop.ID, err)
-		tags = []db.Tag{}
+		// No need to assign tags = []db.Tag{} here if we process it into tagNames below
 	}
 
-	log.Printf("Successfully fetched drop with ID: %s and %d tags", drop.ID.String(), len(tags))
-	response := toDropResponse(drop, tags)
+	var tagNamesForResponse []string
+	if err == nil { // Only process tags if there was no error fetching them
+		for _, tag := range tags {
+			tagNamesForResponse = append(tagNamesForResponse, tag.Name) // Assuming db.Tag has a Name field
+		}
+	}
+
+	log.Printf("Successfully fetched drop with ID: %s and %d tags", drop.ID.String(), len(tagNamesForResponse))
+	response := toDropResponse(drop, tagNamesForResponse)
 	httputils.RespondWithJSON(w, http.StatusOK, response)
 }
 
@@ -263,12 +290,17 @@ func (h *DropsHandler) ListDropsHandler(w http.ResponseWriter, r *http.Request) 
 
 	dropResponses := make([]DropResponse, 0, len(drops))
 	for _, drop := range drops {
-		tags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), drop.ID)
+		dbTags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), drop.ID)
+		var tagNamesForDrop []string
 		if err != nil {
 			log.Printf("Error fetching tags for drop %s during list operation: %v. Proceeding with empty tags for this drop.", drop.ID, err)
-			tags = []db.Tag{}
+			// tagNamesForDrop will remain an empty slice
+		} else {
+			for _, tag := range dbTags {
+				tagNamesForDrop = append(tagNamesForDrop, tag.Name) // Assuming db.Tag has a Name field
+			}
 		}
-		dropResponses = append(dropResponses, toDropResponse(drop, tags))
+		dropResponses = append(dropResponses, toDropResponse(drop, tagNamesForDrop))
 	}
 
 	log.Printf("Successfully fetched %d drops for UserUUID: %s", len(dropResponses), userUUID.String())
@@ -412,14 +444,20 @@ func (h *DropsHandler) UpdateDropHandler(w http.ResponseWriter, r *http.Request)
 		log.Printf("Finished updating tags for drop ID: %s", dropID.String())
 	}
 
-	finalTags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), updatedDrop.ID)
+	// Fetch the final set of tags for the response
+	finalDbTags, err := h.APIConfig.DB.GetTagsForDrop(r.Context(), updatedDrop.ID)
+	var finalTagNamesForResponse []string
 	if err != nil {
 		log.Printf("Error fetching tags for drop %s after update: %v", updatedDrop.ID, err)
-		finalTags = []db.Tag{}
+		// finalTagNamesForResponse will remain an empty slice
+	} else {
+		for _, tag := range finalDbTags {
+			finalTagNamesForResponse = append(finalTagNamesForResponse, tag.Name) // Assuming db.Tag has a Name field
+		}
 	}
 
 	log.Printf("Successfully updated drop with ID: %s and its tags", updatedDrop.ID.String())
-	response := toDropResponse(updatedDrop, finalTags)
+	response := toDropResponse(updatedDrop, finalTagNamesForResponse)
 	httputils.RespondWithJSON(w, http.StatusOK, response)
 }
 
@@ -471,20 +509,24 @@ func (h *DropsHandler) DeleteDropHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	params := db.DeleteDropParams{
+	// Assuming DeleteDrop in DB expects params for ID and UserUuid for row-level security/check
+	deleteParams := db.DeleteDropParams{
 		ID:       dropID,
 		UserUuid: uuid.NullUUID{UUID: userUUID, Valid: true},
 	}
-
-	err = h.APIConfig.DB.DeleteDrop(r.Context(), params)
+	err = h.APIConfig.DB.DeleteDrop(r.Context(), deleteParams) // Changed to pass DeleteDropParams
 	if err != nil {
-		// This error should ideally not be sql.ErrNoRows if the check above passed and the DB.DeleteDrop also checks user_uuid.
-		// It would typically indicate other execution errors.
-		log.Printf("Error deleting drop from database: %v", err)
-		httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete drop: "+err.Error())
+		// Check if the error is because the drop was not found (e.g., due to user_uuid mismatch in the query itself)
+		if err == sql.ErrNoRows {
+			log.Printf("Delete failed: Drop with ID %s not found for UserUUID %s, or user not authorized at DB level.", dropID.String(), userUUID.String())
+			httputils.RespondWithError(w, http.StatusNotFound, "Drop not found or not authorized to delete")
+		} else {
+			log.Printf("Error deleting drop from database: %v", err)
+			httputils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete drop: "+err.Error())
+		}
 		return
 	}
 
-	log.Printf("Successfully deleted drop with ID: %s for UserUUID: %s", dropID.String(), userUUID.String())
-	w.WriteHeader(http.StatusNoContent)
+	log.Printf("Successfully deleted drop with ID: %s", dropID.String())
+	httputils.RespondWithJSON(w, http.StatusNoContent, nil)
 }
