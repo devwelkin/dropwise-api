@@ -19,11 +19,17 @@ func main() {
 	mux := server.NewRouter(cfg)
 	// Configure CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"}, // Your frontend origin
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
-		AllowCredentials: true,
-		Debug:            true, // Enable for development debugging
+		// İzin verilen frontend adresleri. KENDİ VERCEL URL'Nİ YAZMALISIN.
+		AllowedOrigins: []string{"https://dropwise.vercel.app", "http://localhost:5173"},
+
+		// İzin verilen HTTP metodları
+		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
+
+		// İzin verilen HTTP header'ları
+		AllowedHeaders: []string{"Authorization", "Content-Type"},
+
+		// Tarayıcının preflight (OPTIONS) cevabını cache'lemesi için süre (saniye)
+		MaxAge: 86400,
 	})
 	handler := c.Handler(mux)
 
