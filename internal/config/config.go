@@ -11,7 +11,7 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq" // PostgreSQL driver
-	db "github.com/twomotive/dropwise/internal/database/sqlc"
+	db "github.com/nouvadev/dropwise/internal/database/sqlc"
 )
 
 var (

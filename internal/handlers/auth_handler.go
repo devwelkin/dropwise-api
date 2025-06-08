@@ -10,10 +10,10 @@ import (
 	"unicode/utf8" // For more robust validation if needed
 
 	"github.com/google/uuid"
-	"github.com/twomotive/dropwise/internal/auth"
-	"github.com/twomotive/dropwise/internal/config"
-	db "github.com/twomotive/dropwise/internal/database/sqlc"
-	"github.com/twomotive/dropwise/internal/server/httputils"
+	"github.com/nouvadev/dropwise/internal/auth"
+	"github.com/nouvadev/dropwise/internal/config"
+	db "github.com/nouvadev/dropwise/internal/database/sqlc"
+	"github.com/nouvadev/dropwise/internal/server/httputils"
 )
 
 // AuthHandler handles HTTP requests for authentication.

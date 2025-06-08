@@ -1,4 +1,4 @@
-module github.com/twomotive/dropwise
+module github.com/nouvadev/dropwise
 
 go 1.24.3
 

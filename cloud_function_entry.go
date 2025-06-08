@@ -4,7 +4,7 @@ package functionrunner
 import (
 	"net/http"
 
-	"github.com/twomotive/dropwise/internal/worker"
+	"github.com/nouvadev/dropwise/internal/worker"
 )
 
 func ActualEntryPoint(w http.ResponseWriter, r *http.Request) {

@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/twomotive/dropwise/internal/config"
-	db "github.com/twomotive/dropwise/internal/database/sqlc"
-	"github.com/twomotive/dropwise/internal/server/httputils"
+	"github.com/nouvadev/dropwise/internal/config"
+	db "github.com/nouvadev/dropwise/internal/database/sqlc"
+	"github.com/nouvadev/dropwise/internal/server/httputils"
 )
 
 // TagsHandler handles HTTP requests for tags.

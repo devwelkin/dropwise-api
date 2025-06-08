@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/twomotive/dropwise/internal/config"
-	db "github.com/twomotive/dropwise/internal/database/sqlc"
-	"github.com/twomotive/dropwise/internal/middleware" // Ensure middleware is imported
-	"github.com/twomotive/dropwise/internal/server/httputils"
+	"github.com/nouvadev/dropwise/internal/config"
+	db "github.com/nouvadev/dropwise/internal/database/sqlc"
+	"github.com/nouvadev/dropwise/internal/middleware" // Ensure middleware is imported
+	"github.com/nouvadev/dropwise/internal/server/httputils"
 )
 
 // DropsHandler handles HTTP requests for drops.

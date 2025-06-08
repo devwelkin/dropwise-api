@@ -3,10 +3,10 @@ package server
 import (
 	"net/http"
 
-	"github.com/twomotive/dropwise/internal/config"
-	"github.com/twomotive/dropwise/internal/handlers"
-	"github.com/twomotive/dropwise/internal/middleware"
-	"github.com/twomotive/dropwise/internal/server/httputils"
+	"github.com/nouvadev/dropwise/internal/config"
+	"github.com/nouvadev/dropwise/internal/handlers"
+	"github.com/nouvadev/dropwise/internal/middleware"
+	"github.com/nouvadev/dropwise/internal/server/httputils"
 )
 
 // NewRouter creates and newServeMux with all application routes.

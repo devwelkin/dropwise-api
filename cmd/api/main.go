@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/nouvadev/dropwise/internal/config"
+	"github.com/nouvadev/dropwise/internal/server"
 	"github.com/rs/cors"
-	"github.com/twomotive/dropwise/internal/config"
-	"github.com/twomotive/dropwise/internal/server"
 )
 
 func main() {

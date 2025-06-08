@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/twomotive/dropwise/internal/config"
-	db "github.com/twomotive/dropwise/internal/database/sqlc"
-	"github.com/twomotive/dropwise/internal/server/httputils"
+	"github.com/nouvadev/dropwise/internal/config"
+	db "github.com/nouvadev/dropwise/internal/database/sqlc"
+	"github.com/nouvadev/dropwise/internal/server/httputils"
 )
 
 // / ProcessDropsLogic contains the core logic for fetching and "sending" due drops.

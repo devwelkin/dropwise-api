@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/twomotive/dropwise/internal/config"
-	"github.com/twomotive/dropwise/internal/worker"
+	"github.com/nouvadev/dropwise/internal/config"
+	"github.com/nouvadev/dropwise/internal/worker"
 )
 
 func main() {

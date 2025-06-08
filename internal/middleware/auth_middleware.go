@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/twomotive/dropwise/internal/auth"
-	"github.com/twomotive/dropwise/internal/server/httputils"
+	"github.com/nouvadev/dropwise/internal/auth"
+	"github.com/nouvadev/dropwise/internal/server/httputils"
 )
 
 // contextKey is a custom type for context keys to avoid collisions
