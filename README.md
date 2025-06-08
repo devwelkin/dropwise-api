@@ -1,6 +1,6 @@
 # Dropwise API
 
-Dropwise is a powerful content management and automated delivery system that helps users save, organize, and automatically process their favorite links and content. Think of it as a smart bookmark manager with automated content delivery capabilities.
+Dropwise is a content management and automated delivery system that helps users save, organize, and automatically process their favorite links and content. Think of it as a smart bookmark manager.
 
 ## 🚀 Overview
 
@@ -15,7 +15,7 @@ Dropwise allows users to:
 
 The application consists of two main components:
 - **API Server** (`cmd/api`): REST API for user interactions
-- **Worker Process** (`cmd/worker`): Background service for automated content processing
+- **Worker Process** (`cmd/worker`): Background service for notification
 
 ## 🔧 Technology Stack
 
@@ -317,14 +317,6 @@ The application uses environment variables for configuration:
 - `DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: Secret key for JWT token signing
 
-## 🚀 Getting Started
-
-1. **Clone the repository**
-2. **Set up PostgreSQL database**
-3. **Run migrations**: `goose up`
-4. **Set environment variables**
-5. **Start the API server**: `go run cmd/api/main.go`
-6. **Start the worker** (optional): `go run cmd/worker/main.go`
 
 ## 🌐 CORS Configuration
 
@@ -338,13 +330,3 @@ The API is configured to accept requests from:
 - Save interesting articles, videos, and resources
 - Organize content with tags and notes
 - Automatic processing and delivery of saved content
-
-**Content Curation:**
-- Build a personal knowledge base
-- Priority-based content consumption
-- Track content engagement and processing
-
-**Automated Content Delivery:**
-- Background processing of saved content
-- Smart scheduling based on priority
-- User-specific content management
