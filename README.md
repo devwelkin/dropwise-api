@@ -6,16 +6,9 @@ Dropwise is a content management and automated delivery system that helps users 
 
 Dropwise allows users to:
 - **Save links** with topics, notes, and tags for better organization
-- **Automatic processing** of saved content through a background worker system
 - **User management** with secure JWT-based authentication
 - **Tag-based organization** for easy content categorization
-- **Priority-based content delivery** system
 
-## 🏗️ Architecture
-
-The application consists of two main components:
-- **API Server** (`cmd/api`): REST API for user interactions
-- **Worker Process** (`cmd/worker`): Background service for notification
 
 ## 🔧 Technology Stack
 
@@ -25,54 +18,6 @@ The application consists of two main components:
 - **CORS**: Configured for web frontend integration
 - **Migrations**: SQL migrations with goose
 
-## ✅ Current Implementation Status
-
-### ✅ Completed Features
-
-#### **Authentication System**
-- ✅ User registration with email/password
-- ✅ Secure login with JWT tokens
-- ✅ Password hashing with bcrypt
-- ✅ Protected route middleware
-
-#### **Drops CRUD Operations**
-- ✅ **CREATE**: Add new drops with topic, URL, notes, priority, and tags
-- ✅ **READ**: List all user drops & fetch individual drops by ID
-- ✅ **UPDATE**: Modify drop properties including topic, URL, notes, priority, status, and tags
-- ✅ **DELETE**: Remove drops with proper user authorization
-
-#### **Tags Management**
-- ✅ Create tags automatically when adding drops
-- ✅ Associate multiple tags with drops
-- ✅ List all available tags
-- ✅ Update tags when modifying drops
-
-#### **Background Worker System** 🚧
-- ✅ Basic worker infrastructure setup
-- ✅ Drop processing logic framework
-- ✅ Priority-based processing (higher priority first)
-- ✅ One drop per user per cycle
-- ✅ Status tracking (`new` → `sent`)
-- ✅ Send count and last sent date tracking
-- ✅ Cloud Function deployment ready
-- ⏳ **In Progress**: Actual notification delivery (email, push, etc.)
-- ⏳ **In Progress**: Reminder scheduling system
-- ⏳ **In Progress**: Smart timing algorithms
-
-#### **Database Design**
-- ✅ PostgreSQL with UUID primary keys
-- ✅ Type-safe queries with SQLC
-- ✅ Database migrations with Goose
-- ✅ Proper indexing for performance
-- ✅ Referential integrity with foreign keys
-
-## 🔮 Roadmap: Smart Reminder System
-
-### 🎯 Phase 1: Advanced Scheduling (Q1 2025)
-- [ ] **Custom Reminder Intervals**: Allow users to set custom intervals (daily, weekly, monthly, custom)
-- [ ] **Scheduled Reminders**: Time-based reminders (morning, afternoon, evening)
-- [ ] **Smart Snoozing**: Intelligent snooze functionality with multiple snooze options
-- [ ] **Reminder Templates**: Pre-defined reminder patterns for different content types
 
 ...
 
@@ -286,43 +231,6 @@ Authorization: Bearer <your-jwt-token>
 - `id`: Unique identifier
 - `name`: Tag name
 
-## 🤖 Worker System
-
-The application includes a background worker system foundation that:
-- ✅ **Infrastructure**: Basic worker setup with database integration
-- ✅ **Processing Logic**: Fetches drops with `new` status for processing
-- ✅ **Priority Handling**: Processes drops by priority level and creation date
-- ✅ **User Management**: Handles one drop per user per cycle
-- ✅ **Status Tracking**: Updates drop status and tracking information
-- ✅ **Deployment Ready**: Can be run as standalone process or Cloud Function
-- 🚧 **In Development**: Actual notification delivery mechanisms
-- 🚧 **Planned**: Email, push notifications, and smart scheduling
-
-**Current State**: The worker simulates sending notifications but doesn't yet deliver actual reminders. The infrastructure is ready for implementing various notification channels.
-
-## 🚦 Status Codes
-
-- `200 OK`: Successful request
-- `201 Created`: Resource created successfully
-- `400 Bad Request`: Invalid request data
-- `401 Unauthorized`: Authentication required or invalid
-- `403 Forbidden`: Access denied
-- `404 Not Found`: Resource not found
-- `500 Internal Server Error`: Server error
-
-## 🔧 Configuration
-
-The application uses environment variables for configuration:
-- `PORT`: Server port (default: 8080)
-- `DATABASE_URL`: PostgreSQL connection string
-- `JWT_SECRET`: Secret key for JWT token signing
-
-
-## 🌐 CORS Configuration
-
-The API is configured to accept requests from:
-- `https://dropwise.vercel.app` (Production frontend)
-- `http://localhost:5173` (Development frontend)
 
 ## 🏷️ Use Cases
 
